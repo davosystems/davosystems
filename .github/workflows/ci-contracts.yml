@@ -1,0 +1,124 @@
+name: CI - Smart Contracts
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'contracts/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'contracts/**' ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+    
+    - name: Cache Foundry
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/foundry
+          ~/.config/foundry
+        key: ${{ runner.os }}-foundry-${{ hashFiles('contracts/foundry.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-foundry-
+    
+    - name: Install dependencies
+      run: |
+        cd contracts
+        forge install
+    
+    - name: Format code
+      run: |
+        cd contracts
+        forge fmt --check
+    
+    - name: Build contracts
+      run: |
+        cd contracts
+        forge build
+    
+    - name: Run tests
+      run: |
+        cd contracts
+        forge test --gas-report
+    
+    - name: Run coverage
+      run: |
+        cd contracts
+        forge coverage --report lcov
+        genhtml lcov.info -o coverage/
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: contracts/lcov.info
+        flags: contracts
+        name: contracts-coverage
+
+  security:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+    
+    - name: Install Slither
+      run: |
+        pip install slither-analyzer
+    
+    - name: Run Slither
+      run: |
+        cd contracts
+        slither . --config-file slither.config.json
+    
+    - name: Run Mythril
+      run: |
+        cd contracts
+        myth analyze src/ --solc-json mythril.config.json
+
+  deploy-testnet:
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly
+    
+    - name: Deploy to Base Sepolia
+      env:
+        PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+        BASE_SEPOLIA_RPC: ${{ secrets.BASE_SEPOLIA_RPC }}
+        BASESCAN_API_KEY: ${{ secrets.BASESCAN_API_KEY }}
+      run: |
+        cd contracts
+        forge script script/DeployBaseSepolia.s.sol \
+          --rpc-url $BASE_SEPOLIA_RPC \
+          --broadcast \
+          --verify \
+          --etherscan-api-key $BASESCAN_API_KEY
+    
+    - name: Update addresses
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add docs/addresses.md
+        git commit -m "Update contract addresses after deployment" || exit 0
+        git push

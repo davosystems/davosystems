@@ -1,0 +1,95 @@
+name: CI - ROS 2 Bridge
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'ros2-davo-bridge/**' ]
+  pull_request:
+    branches: [ main ]
+    paths: [ 'ros2-davo-bridge/**' ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install ROS 2 Humble
+      uses: ros-tooling/setup-ros@v0.3
+      with:
+        required-ros-distributions: humble
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pip python3-colcon-common-extensions
+        pip install web3 eth-account pyyaml pytest
+    
+    - name: Build ROS 2 package
+      run: |
+        cd ros2-davo-bridge
+        colcon build --packages-select davo_bridge
+    
+    - name: Run tests
+      run: |
+        cd ros2-davo-bridge
+        colcon test --packages-select davo_bridge
+        colcon test-result --verbose
+    
+    - name: Run linting
+      run: |
+        cd ros2-davo-bridge
+        python3 -m flake8 davo_bridge/ --max-line-length=100
+        python3 -m black --check davo_bridge/
+    
+    - name: Run unit tests
+      run: |
+        cd ros2-davo-bridge
+        python3 -m pytest tests/ -v --cov=davo_bridge --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ros2-davo-bridge/coverage.xml
+        flags: ros2-bridge
+        name: ros2-bridge-coverage
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install ROS 2 Humble
+      uses: ros-tooling/setup-ros@v0.3
+      with:
+        required-ros-distributions: humble
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pip python3-colcon-common-extensions
+        pip install web3 eth-account pyyaml pytest
+    
+    - name: Build package
+      run: |
+        cd ros2-davo-bridge
+        colcon build --packages-select davo_bridge
+    
+    - name: Run integration tests
+      run: |
+        cd ros2-davo-bridge
+        source install/setup.bash
+        python3 -m pytest tests/test_integration.py -v

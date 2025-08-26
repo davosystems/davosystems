@@ -1,0 +1,63 @@
+sequenceDiagram
+    participant O as Orchestrator
+    participant B as Bridge Node
+    participant T as TaskEscrow
+    participant R as Robot
+    participant F as FeeRouter
+    participant D as DAVO Token
+
+    Note over O,D: Task Lifecycle - Commit-Reveal Bidding
+
+    %% Task Creation
+    O->>B: Task Request (spec, budget)
+    B->>T: postTask(specHash, budget)
+    T->>D: transferFrom(orchestrator, escrow, budget)
+    T-->>B: TaskPosted event (taskId)
+    B-->>O: Task ID confirmed
+
+    %% Bidding Phase - Commit
+    Note over R,T: Commit Window Opens
+    R->>T: commitBid(taskId, hash(price, salt, bidder))
+    T-->>R: BidCommitted event
+    Note over R,T: Commit Window Closes
+
+    %% Bidding Phase - Reveal
+    Note over R,T: Reveal Window Opens
+    R->>T: revealBid(taskId, price, salt)
+    T->>T: verify hash matches commitment
+    T-->>R: BidRevealed event
+    Note over R,T: Reveal Window Closes
+
+    %% Task Assignment
+    T->>T: determine lowest valid bid
+    T->>T: assignWinner(taskId, winner)
+    T-->>R: TaskAssigned event
+    B->>R: Task Assignment Notification
+
+    %% Task Execution
+    Note over R: Robot performs task in physical environment
+    R->>R: Execute task (ROS 2 / RMF)
+    R->>R: Generate telemetry data
+    R->>R: Compute resultHash = keccak256(telemetry)
+
+    %% Result Submission
+    R->>R: Sign resultHash with EIP-712
+    R->>B: Task Result (resultHash, signature)
+    B->>T: submitResult(taskId, resultHash, robotId, signature)
+    T->>T: verify EIP-712 signature
+    T-->>B: TaskResultSubmitted event
+
+    %% Settlement
+    T->>T: settle(taskId)
+    T->>D: transfer(winner, payment)
+    T->>F: transfer(feeAmount)
+    T-->>B: TaskSettled event (winner, paid)
+    
+    %% Fee Distribution
+    F->>F: split fees 50/50
+    F->>D: burn(burnAmount)
+    F->>F: transferToTreasury(treasuryAmount)
+    F-->>B: FeesRouted event
+    F-->>B: TokensBurned event
+
+    Note over O,D: Task Lifecycle Complete

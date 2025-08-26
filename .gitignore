@@ -1,0 +1,56 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+lib/
+out/
+
+# Build artifacts
+build/
+dist/
+*.pyc
+__pycache__/
+*.so
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ROS 2
+install/
+build/
+log/
+
+# Foundry
+cache/
+out/
+broadcast/
+
+# Python
+*.egg-info/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Temporary files
+*.tmp
+*.temp
+demo_data.json
