@@ -1,5 +1,7 @@
 # Davo Systems
 
+![ui](https://github.com/user-attachments/assets/81f3b42e-1e6a-4466-97ac-2e4858561060)
+
 On-chain coordination layer for robotics on Base.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
